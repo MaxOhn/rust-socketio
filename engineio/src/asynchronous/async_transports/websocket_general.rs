@@ -78,27 +78,6 @@ impl AsyncWebsocketGeneralTransport {
 
         Ok(())
     }
-
-    pub(crate) async fn poll_next(&self) -> Result<Option<Bytes>> {
-        loop {
-            let mut receiver = self.receiver.lock().await;
-            let next = receiver.next().await;
-            match next {
-                Some(Ok(Message::Text(str))) => return Ok(Some(Bytes::from(str))),
-                Some(Ok(Message::Binary(data))) => {
-                    let mut msg = BytesMut::with_capacity(data.len() + 1);
-                    msg.put_u8(PacketId::Message as u8);
-                    msg.put(data.as_ref());
-
-                    return Ok(Some(msg.freeze()));
-                }
-                // ignore packets other than text and binary
-                Some(Ok(_)) => (),
-                Some(Err(err)) => return Err(err.into()),
-                None => return Ok(None),
-            }
-        }
-    }
 }
 
 impl Stream for AsyncWebsocketGeneralTransport {

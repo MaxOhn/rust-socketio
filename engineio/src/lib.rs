@@ -69,25 +69,11 @@
 #![warn(clippy::style)]
 #![warn(clippy::perf)]
 #![warn(clippy::correctness)]
-/// A small macro that spawns a scoped thread. Used for calling the callback
-/// functions.
-macro_rules! spawn_scoped {
-    ($e:expr) => {
-        std::thread::scope(|s| {
-            s.spawn(|| $e);
-        });
-    };
-}
 
 pub mod asynchronous;
-mod callback;
-pub mod client;
 /// Generic header map
 pub mod header;
 pub mod packet;
-pub(self) mod socket;
-pub mod transport;
-pub mod transports;
 
 pub const ENGINE_IO_VERSION: i32 = 4;
 
@@ -95,7 +81,6 @@ pub const ENGINE_IO_VERSION: i32 = 4;
 /// crate. Handles all kinds of errors.
 pub mod error;
 
-pub use client::{Client, ClientBuilder};
 pub use error::Error;
 pub use packet::{Packet, PacketId};
 

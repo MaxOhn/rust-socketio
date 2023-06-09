@@ -169,7 +169,6 @@ pub(crate) mod packet;
 /// Defines the types of payload (binary or string), that
 /// could be sent or received.
 pub mod payload;
-pub(self) mod socket;
 
 /// Deprecated import since 0.3.0-alpha-2, use Error in the crate root instead.
 /// Contains the error type which will be returned with every result in this
@@ -186,11 +185,7 @@ pub use error::Error;
 
 pub use {event::Event, payload::Payload};
 
-pub use client::{ClientBuilder, RawClient, TransportType};
-
-// TODO: 0.4.0 remove
-#[deprecated(since = "0.3.0-alpha-2", note = "Socket renamed to Client")]
-pub use client::{ClientBuilder as SocketBuilder, RawClient as Socket};
+pub use client::TransportType;
 
 #[cfg(test)]
 pub(crate) mod test {
@@ -216,21 +211,6 @@ pub(crate) mod test {
     pub(crate) fn socket_io_auth_server() -> Url {
         let url =
             std::env::var("SOCKET_IO_AUTH_SERVER").unwrap_or_else(|_| AUTH_SERVER_URL.to_owned());
-        let mut url = Url::parse(&url).unwrap();
-
-        if url.path() == "/" {
-            url.set_path("/socket.io/");
-        }
-
-        url
-    }
-
-    // The socket.io restart server for testing runs on port 4205
-    const RESTART_SERVER_URL: &str = "http://localhost:4205";
-
-    pub(crate) fn socket_io_restart_server() -> Url {
-        let url = std::env::var("SOCKET_IO_RESTART_SERVER")
-            .unwrap_or_else(|_| RESTART_SERVER_URL.to_owned());
         let mut url = Url::parse(&url).unwrap();
 
         if url.path() == "/" {
