@@ -10,8 +10,7 @@ use futures_util::Stream;
 use futures_util::StreamExt;
 use http::HeaderMap;
 use tokio::sync::RwLock;
-use tokio_tungstenite::connect_async_tls_with_config;
-use tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::{connect_async_tls_with_config, tungstenite::client::IntoClientRequest};
 use url::Url;
 
 use super::websocket_general::AsyncWebsocketGeneralTransport;
