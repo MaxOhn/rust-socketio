@@ -94,7 +94,6 @@ mod test {
     use crate::{asynchronous::ClientBuilder, header::HeaderMap, packet::PacketId, Error};
     use bytes::Bytes;
     use futures_util::StreamExt;
-    use native_tls::TlsConnector;
     use url::Url;
 
     /// The purpose of this test is to check whether the Client is properly cloneable or not.
@@ -278,8 +277,7 @@ mod test {
     #[tokio::test]
     async fn test_connection_dynamic_secure() -> Result<()> {
         let url = crate::test::engine_io_server_secure()?;
-        let mut socket_builder = builder(url);
-        socket_builder = socket_builder.tls_config(crate::test::tls_connector()?);
+        let socket_builder = builder(url);
         let socket = socket_builder.build().await?;
         test_connection(socket).await
     }
@@ -304,7 +302,6 @@ mod test {
         headers.insert(HOST, host);
         let mut builder = builder(url.clone());
 
-        builder = builder.tls_config(crate::test::tls_connector()?);
         builder = builder.headers(headers.clone());
         let socket = builder.clone().build_websocket_with_upgrade().await?;
 
@@ -316,9 +313,7 @@ mod test {
 
         url.set_scheme("wss").unwrap();
 
-        let builder = self::builder(url)
-            .tls_config(crate::test::tls_connector()?)
-            .headers(headers);
+        let builder = self::builder(url).headers(headers);
         let socket = builder.clone().build_websocket().await?;
 
         test_connection(socket).await?;
@@ -381,15 +376,7 @@ mod test {
             std::env::var("ENGINE_IO_SECURE_HOST").unwrap_or_else(|_| "localhost".to_owned());
         headers.insert(HOST, host);
 
-        let _ = builder(url.clone())
-            .tls_config(
-                TlsConnector::builder()
-                    .danger_accept_invalid_certs(true)
-                    .build()
-                    .unwrap(),
-            )
-            .build()
-            .await?;
+        let _ = builder(url.clone()).build().await?;
         let _ = builder(url).headers(headers).build().await?;
         Ok(())
     }

@@ -86,26 +86,6 @@ pub use packet::{Packet, PacketId};
 
 #[cfg(test)]
 pub(crate) mod test {
-    use super::*;
-    use native_tls::TlsConnector;
-    const CERT_PATH: &str = "../ci/cert/ca.crt";
-    use native_tls::Certificate;
-    use std::fs::File;
-    use std::io::Read;
-
-    pub(crate) fn tls_connector() -> error::Result<TlsConnector> {
-        let cert_path = std::env::var("CA_CERT_PATH").unwrap_or_else(|_| CERT_PATH.to_owned());
-        let mut cert_file = File::open(cert_path)?;
-        let mut buf = vec![];
-        cert_file.read_to_end(&mut buf)?;
-        let cert: Certificate = Certificate::from_pem(&buf[..]).unwrap();
-        Ok(TlsConnector::builder()
-            // ONLY USE FOR TESTING!
-            .danger_accept_invalid_hostnames(true)
-            .add_root_certificate(cert)
-            .build()
-            .unwrap())
-    }
     /// The `engine.io` server for testing runs on port 4201
     const SERVER_URL: &str = "http://localhost:4201";
     /// The `engine.io` server that refuses upgrades runs on port 4203

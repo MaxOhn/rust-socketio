@@ -1,6 +1,5 @@
 use futures_util::{future::BoxFuture, StreamExt};
 use log::trace;
-use native_tls::TlsConnector;
 use rust_engineio::{
     asynchronous::ClientBuilder as EngineIoClientBuilder,
     header::{HeaderMap, HeaderValue},
@@ -25,7 +24,6 @@ pub struct ClientBuilder {
     on: HashMap<Event, Callback<DynAsyncCallback>>,
     on_any: Option<Callback<DynAsyncAnyCallback>>,
     namespace: String,
-    tls_config: Option<TlsConnector>,
     opening_headers: Option<HeaderMap>,
     transport_type: TransportType,
     auth: Option<serde_json::Value>,
@@ -75,7 +73,6 @@ impl ClientBuilder {
             on: HashMap::new(),
             on_any: None,
             namespace: "/".to_owned(),
-            tls_config: None,
             opening_headers: None,
             transport_type: TransportType::Any,
             auth: None,
@@ -201,34 +198,6 @@ impl ClientBuilder {
         F: for<'a> FnMut(Event, Payload, Client) -> BoxFuture<'static, ()> + 'static + Send + Sync,
     {
         self.on_any = Some(Callback::<DynAsyncAnyCallback>::new(callback));
-        self
-    }
-
-    /// Uses a preconfigured TLS connector for secure communication. This configures
-    /// both the `polling` as well as the `websocket` transport type.
-    /// # Example
-    /// ```rust
-    /// use rust_socketio::{asynchronous::ClientBuilder, Payload};
-    /// use native_tls::TlsConnector;
-    /// use futures_util::future::FutureExt;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let tls_connector =  TlsConnector::builder()
-    ///                .use_sni(true)
-    ///                .build()
-    ///             .expect("Found illegal configuration");
-    ///
-    ///     let socket = ClientBuilder::new("http://localhost:4200/")
-    ///         .namespace("/admin")
-    ///         .on("error", |err, _| async move { eprintln!("Error: {:#?}", err) }.boxed())
-    ///         .tls_config(tls_connector)
-    ///         .connect()
-    ///         .await;
-    /// }
-    /// ```
-    pub fn tls_config(mut self, tls_config: TlsConnector) -> Self {
-        self.tls_config = Some(tls_config);
         self
     }
 
@@ -369,9 +338,6 @@ impl ClientBuilder {
 
         let mut builder = EngineIoClientBuilder::new(url);
 
-        if let Some(tls_config) = self.tls_config {
-            builder = builder.tls_config(tls_config);
-        }
         if let Some(headers) = self.opening_headers {
             builder = builder.headers(headers);
         }

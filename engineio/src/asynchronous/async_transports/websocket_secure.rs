@@ -9,10 +9,8 @@ use bytes::Bytes;
 use futures_util::Stream;
 use futures_util::StreamExt;
 use http::HeaderMap;
-use native_tls::TlsConnector;
 use tokio::sync::RwLock;
 use tokio_tungstenite::connect_async_tls_with_config;
-use tokio_tungstenite::Connector;
 use tungstenite::client::IntoClientRequest;
 use url::Url;
 
@@ -30,11 +28,7 @@ pub struct WebsocketSecureTransport {
 impl WebsocketSecureTransport {
     /// Creates a new instance over a request that might hold additional headers, a possible
     /// Tls connector and an URL.
-    pub(crate) async fn new(
-        base_url: Url,
-        tls_config: Option<TlsConnector>,
-        headers: Option<HeaderMap>,
-    ) -> Result<Self> {
+    pub(crate) async fn new(base_url: Url, headers: Option<HeaderMap>) -> Result<Self> {
         let mut url = base_url;
         url.query_pairs_mut().append_pair("transport", "websocket");
         url.set_scheme("wss").unwrap();
@@ -45,9 +39,7 @@ impl WebsocketSecureTransport {
             req.headers_mut().extend(map);
         }
 
-        let (ws_stream, _) =
-            connect_async_tls_with_config(req, None, false, tls_config.map(Connector::NativeTls))
-                .await?;
+        let (ws_stream, _) = connect_async_tls_with_config(req, None, false, None).await?;
 
         let (sen, rec) = ws_stream.split();
         let inner = AsyncWebsocketGeneralTransport::new(sen, rec).await;
@@ -124,12 +116,7 @@ mod test {
         let url = crate::test::engine_io_server_secure()?.to_string()
             + "engine.io/?EIO="
             + &ENGINE_IO_VERSION.to_string();
-        WebsocketSecureTransport::new(
-            Url::from_str(&url[..])?,
-            Some(crate::test::tls_connector()?),
-            None,
-        )
-        .await
+        WebsocketSecureTransport::new(Url::from_str(&url[..])?, None).await
     }
 
     #[tokio::test]

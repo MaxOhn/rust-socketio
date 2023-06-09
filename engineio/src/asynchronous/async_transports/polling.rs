@@ -5,7 +5,6 @@ use base64::{engine::general_purpose, Engine as _};
 use bytes::{BufMut, Bytes, BytesMut};
 use futures_util::{Stream, StreamExt};
 use http::HeaderMap;
-use native_tls::TlsConnector;
 use reqwest::{Client, ClientBuilder, Response};
 use std::fmt::Debug;
 use std::time::SystemTime;
@@ -26,23 +25,10 @@ pub struct PollingTransport {
 }
 
 impl PollingTransport {
-    pub fn new(
-        base_url: Url,
-        tls_config: Option<TlsConnector>,
-        opening_headers: Option<HeaderMap>,
-    ) -> Self {
-        let client = match (tls_config, opening_headers) {
-            (Some(config), Some(map)) => ClientBuilder::new()
-                .use_preconfigured_tls(config)
-                .default_headers(map)
-                .build()
-                .unwrap(),
-            (Some(config), None) => ClientBuilder::new()
-                .use_preconfigured_tls(config)
-                .build()
-                .unwrap(),
-            (None, Some(map)) => ClientBuilder::new().default_headers(map).build().unwrap(),
-            (None, None) => Client::new(),
+    pub fn new(base_url: Url, opening_headers: Option<HeaderMap>) -> Self {
+        let client = match opening_headers {
+            Some(map) => ClientBuilder::new().default_headers(map).build().unwrap(),
+            None => Client::new(),
         };
 
         let mut url = base_url;
@@ -168,7 +154,7 @@ mod test {
     #[tokio::test]
     async fn polling_transport_base_url() -> Result<()> {
         let url = crate::test::engine_io_server()?.to_string();
-        let transport = PollingTransport::new(Url::from_str(&url[..]).unwrap(), None, None);
+        let transport = PollingTransport::new(Url::from_str(&url[..]).unwrap(), None);
         assert_eq!(
             transport.base_url().await?.to_string(),
             url.clone() + "?transport=polling"

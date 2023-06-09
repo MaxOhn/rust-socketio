@@ -12,7 +12,6 @@ use crate::{
 };
 use bytes::Bytes;
 use futures_util::{future::BoxFuture, StreamExt};
-use native_tls::TlsConnector;
 use url::Url;
 
 use super::Client;
@@ -20,7 +19,6 @@ use super::Client;
 #[derive(Clone, Debug)]
 pub struct ClientBuilder {
     url: Url,
-    tls_config: Option<TlsConnector>,
     headers: Option<HeaderMap>,
     handshake: Option<HandshakePacket>,
     on_error: OptionalCallback<String>,
@@ -43,7 +41,6 @@ impl ClientBuilder {
         ClientBuilder {
             url,
             headers: None,
-            tls_config: None,
             handshake: None,
             on_close: OptionalCallback::default(),
             on_data: OptionalCallback::default(),
@@ -51,12 +48,6 @@ impl ClientBuilder {
             on_open: OptionalCallback::default(),
             on_packet: OptionalCallback::default(),
         }
-    }
-
-    /// Specify transport's tls config
-    pub fn tls_config(mut self, tls_config: TlsConnector) -> Self {
-        self.tls_config = Some(tls_config);
-        self
     }
 
     /// Specify transport's HTTP headers
@@ -153,8 +144,7 @@ impl ClientBuilder {
         };
 
         // Start with polling transport
-        let mut transport =
-            PollingTransport::new(self.url.clone(), self.tls_config.clone(), headers);
+        let mut transport = PollingTransport::new(self.url.clone(), headers);
 
         self.handshake_with_transport(&mut transport).await
     }
@@ -175,11 +165,8 @@ impl ClientBuilder {
         self.handshake().await?;
 
         // Make a polling transport with new sid
-        let transport = PollingTransport::new(
-            self.url,
-            self.tls_config,
-            self.headers.map(|v| v.try_into().unwrap()),
-        );
+        let transport =
+            PollingTransport::new(self.url, self.headers.map(|v| v.try_into().unwrap()));
 
         // SAFETY: handshake function called previously.
         Ok(Client::new(InnerSocket::new(
@@ -234,12 +221,8 @@ impl ClientBuilder {
                 )))
             }
             "https" | "wss" => {
-                let mut transport = WebsocketSecureTransport::new(
-                    self.url.clone(),
-                    self.tls_config.clone(),
-                    headers,
-                )
-                .await?;
+                let mut transport =
+                    WebsocketSecureTransport::new(self.url.clone(), headers).await?;
 
                 if self.handshake.is_some() {
                     transport.upgrade().await?;

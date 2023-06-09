@@ -1,9 +1,5 @@
 use criterion::{criterion_group, criterion_main};
-use native_tls::Certificate;
-use native_tls::TlsConnector;
 use rust_engineio::error::Error;
-use std::fs::File;
-use std::io::Read;
 use url::Url;
 
 pub use criterion_wrappers::*;
@@ -22,21 +18,6 @@ pub mod util {
         let url = std::env::var("ENGINE_IO_SECURE_SERVER")
             .unwrap_or_else(|_| "https://localhost:4202".to_owned());
         Ok(Url::parse(&url)?)
-    }
-
-    pub fn tls_connector() -> Result<TlsConnector, Error> {
-        let cert_path = "../".to_owned()
-            + &std::env::var("CA_CERT_PATH").unwrap_or_else(|_| "ci/cert/ca.crt".to_owned());
-        let mut cert_file = File::open(cert_path)?;
-        let mut buf = vec![];
-        cert_file.read_to_end(&mut buf)?;
-        let cert: Certificate = Certificate::from_pem(&buf[..]).unwrap();
-        Ok(TlsConnector::builder()
-            // ONLY USE FOR TESTING!
-            .danger_accept_invalid_hostnames(true)
-            .add_root_certificate(cert)
-            .build()
-            .unwrap())
     }
 }
 
@@ -208,8 +189,6 @@ pub mod tests {
     };
     use url::Url;
 
-    use crate::tls_connector;
-
     pub async fn engine_io_socket_build(url: Url) -> Result<Client, Error> {
         ClientBuilder::new(url).build().await
     }
@@ -219,10 +198,7 @@ pub mod tests {
     }
 
     pub async fn engine_io_socket_build_polling_secure(url: Url) -> Result<Client, Error> {
-        ClientBuilder::new(url)
-            .tls_config(tls_connector()?)
-            .build_polling()
-            .await
+        ClientBuilder::new(url).build_polling().await
     }
 
     pub async fn engine_io_socket_build_websocket(url: Url) -> Result<Client, Error> {
@@ -230,10 +206,7 @@ pub mod tests {
     }
 
     pub async fn engine_io_socket_build_websocket_secure(url: Url) -> Result<Client, Error> {
-        ClientBuilder::new(url)
-            .tls_config(tls_connector()?)
-            .build_websocket()
-            .await
+        ClientBuilder::new(url).build_websocket().await
     }
 
     pub fn engine_io_packet() -> Packet {

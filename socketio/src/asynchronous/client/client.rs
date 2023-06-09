@@ -440,7 +440,6 @@ mod test {
 
     use bytes::Bytes;
     use futures_util::{FutureExt, StreamExt};
-    use native_tls::TlsConnector;
     use serde_json::json;
     use tokio::{
         sync::mpsc,
@@ -556,14 +555,8 @@ mod test {
         // test socket build logic
         let socket_builder = ClientBuilder::new(url);
 
-        let tls_connector = TlsConnector::builder()
-            .use_sni(true)
-            .build()
-            .expect("Found illegal configuration");
-
         let socket = socket_builder
             .namespace("/admin")
-            .tls_config(tls_connector)
             .opening_header("accept-encoding", "application/json")
             .on("test", |str, _| {
                 async move { println!("Received: {:#?}", str) }.boxed()
@@ -607,14 +600,8 @@ mod test {
         // test socket build logic
         let socket_builder = ClientBuilder::new(url);
 
-        let tls_connector = TlsConnector::builder()
-            .use_sni(true)
-            .build()
-            .expect("Found illegal configuration");
-
         let socket = socket_builder
             .namespace("/admin")
-            .tls_config(tls_connector)
             .opening_header("accept-encoding", "application/json")
             .on("test", |str, _| {
                 async move { println!("Received: {:#?}", str) }.boxed()
