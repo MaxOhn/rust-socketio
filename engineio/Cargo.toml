@@ -13,13 +13,13 @@ license = "MIT"
 [dependencies]
 base64 = "0.21.0"
 bytes = "1"
-reqwest = { version = "0.11.16", default-features = false, features = ["blocking", "rustls-tls-webpki-roots", "stream"] }
+reqwest = { version = "0.11.16", default-features = false, features = ["rustls-tls-webpki-roots", "stream"] }
 adler32 = "1.2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 http = "0.2.9"
 tokio-tungstenite = { version = "0.19", features = ["rustls-tls-webpki-roots"] }
-tokio = "1.16.1"
+tokio = { version = "1.16.1", default-features = false, features = ["sync"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 async-trait = "0.1.68"
 async-stream = "0.3.5"
@@ -33,7 +33,7 @@ lazy_static = "1.4.0"
 [dev-dependencies.tokio]
 version = "1.16.1"
 # we need the `#[tokio::test]` macro
-features = ["macros"]
+features = ["macros", "rt-multi-thread"]
 
 [[bench]]
 name = "engineio"
