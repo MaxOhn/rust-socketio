@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     asynchronous::{
         async_socket::Socket as InnerSocket,
@@ -12,6 +14,7 @@ use crate::{
 };
 use bytes::Bytes;
 use futures_util::{future::BoxFuture, StreamExt};
+use rustls::ClientConfig;
 use url::Url;
 
 use super::Client;
@@ -19,6 +22,7 @@ use super::Client;
 #[derive(Clone, Debug)]
 pub struct ClientBuilder {
     url: Url,
+    tls_config: Option<Arc<ClientConfig>>,
     headers: Option<HeaderMap>,
     handshake: Option<HandshakePacket>,
     on_error: OptionalCallback<String>,
@@ -38,8 +42,10 @@ impl ClientBuilder {
         if url.path() == "/" {
             url.set_path("/engine.io/");
         }
+
         ClientBuilder {
             url,
+            tls_config: None,
             headers: None,
             handshake: None,
             on_close: OptionalCallback::default(),
@@ -48,6 +54,12 @@ impl ClientBuilder {
             on_open: OptionalCallback::default(),
             on_packet: OptionalCallback::default(),
         }
+    }
+
+    /// Specify transport's tls config
+    pub fn tls_config(mut self, tls_config: Arc<ClientConfig>) -> Self {
+        self.tls_config = Some(tls_config);
+        self
     }
 
     /// Specify transport's HTTP headers
@@ -221,8 +233,12 @@ impl ClientBuilder {
                 )))
             }
             "https" | "wss" => {
-                let mut transport =
-                    WebsocketSecureTransport::new(self.url.clone(), headers).await?;
+                let mut transport = WebsocketSecureTransport::new(
+                    self.url.clone(),
+                    self.tls_config.clone(),
+                    headers,
+                )
+                .await?;
 
                 if self.handshake.is_some() {
                     transport.upgrade().await?;

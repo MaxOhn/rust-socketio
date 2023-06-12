@@ -9,7 +9,9 @@ use bytes::Bytes;
 use futures_util::Stream;
 use futures_util::StreamExt;
 use http::HeaderMap;
+use rustls::ClientConfig;
 use tokio::sync::RwLock;
+use tokio_tungstenite::Connector;
 use tokio_tungstenite::{connect_async_tls_with_config, tungstenite::client::IntoClientRequest};
 use url::Url;
 
@@ -27,18 +29,25 @@ pub struct WebsocketSecureTransport {
 impl WebsocketSecureTransport {
     /// Creates a new instance over a request that might hold additional headers, a possible
     /// Tls connector and an URL.
-    pub(crate) async fn new(base_url: Url, headers: Option<HeaderMap>) -> Result<Self> {
+    pub(crate) async fn new(
+        base_url: Url,
+        tls_config: Option<Arc<ClientConfig>>,
+        headers: Option<HeaderMap>,
+    ) -> Result<Self> {
         let mut url = base_url;
         url.query_pairs_mut().append_pair("transport", "websocket");
         url.set_scheme("wss").unwrap();
 
         let mut req = url.clone().into_client_request()?;
+
         if let Some(map) = headers {
             // SAFETY: this unwrap never panics as the underlying request is just initialized and in proper state
             req.headers_mut().extend(map);
         }
 
-        let (ws_stream, _) = connect_async_tls_with_config(req, None, false, None).await?;
+        let (ws_stream, _) =
+            connect_async_tls_with_config(req, None, false, tls_config.map(Connector::Rustls))
+                .await?;
 
         let (sen, rec) = ws_stream.split();
         let inner = AsyncWebsocketGeneralTransport::new(sen, rec).await;
@@ -115,7 +124,12 @@ mod test {
         let url = crate::test::engine_io_server_secure()?.to_string()
             + "engine.io/?EIO="
             + &ENGINE_IO_VERSION.to_string();
-        WebsocketSecureTransport::new(Url::from_str(&url[..])?, None).await
+        WebsocketSecureTransport::new(
+            Url::from_str(&url[..])?,
+            Some(crate::test::tls_connector()?),
+            None,
+        )
+        .await
     }
 
     #[tokio::test]
@@ -129,7 +143,7 @@ mod test {
         url.set_scheme("wss").unwrap();
         assert_eq!(transport.base_url().await?.to_string(), url.to_string());
         transport
-            .set_base_url(reqwest::Url::parse("https://127.0.0.1")?)
+            .set_base_url(Url::parse("https://127.0.0.1")?)
             .await?;
         assert_eq!(
             transport.base_url().await?.to_string(),
@@ -138,9 +152,7 @@ mod test {
         assert_ne!(transport.base_url().await?.to_string(), url.to_string());
 
         transport
-            .set_base_url(reqwest::Url::parse(
-                "http://127.0.0.1/?transport=websocket",
-            )?)
+            .set_base_url(Url::parse("http://127.0.0.1/?transport=websocket")?)
             .await?;
         assert_eq!(
             transport.base_url().await?.to_string(),

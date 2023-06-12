@@ -86,6 +86,37 @@ pub use packet::{Packet, PacketId};
 
 #[cfg(test)]
 pub(crate) mod test {
+
+    use super::*;
+    // use native_tls::TlsConnector;
+    // use native_tls::Certificate;
+    use rustls::{Certificate, ClientConfig, RootCertStore};
+    use rustls_pemfile::Item;
+    const CERT_PATH: &str = "../ci/cert/ca.crt";
+    use std::fs::File;
+    use std::io::BufReader;
+    use std::sync::Arc;
+
+    pub(crate) fn tls_connector() -> error::Result<Arc<ClientConfig>> {
+        let cert_path = std::env::var("CA_CERT_PATH").unwrap_or_else(|_| CERT_PATH.to_owned());
+        let mut cert_file = BufReader::new(File::open(cert_path)?);
+
+        let cert = match rustls_pemfile::read_one(&mut cert_file)?.unwrap() {
+            Item::X509Certificate(cert) => Certificate(cert),
+            _ => panic!("Invalid certificate encoding"),
+        };
+        let mut root_store = RootCertStore::empty();
+        root_store.add(&cert).unwrap();
+
+        let mut config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
+
+        config.enable_sni = false;
+
+        Ok(Arc::new(config))
+    }
     /// The `engine.io` server for testing runs on port 4201
     const SERVER_URL: &str = "http://localhost:4201";
     /// The `engine.io` server that refuses upgrades runs on port 4203

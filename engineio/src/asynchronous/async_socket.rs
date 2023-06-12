@@ -5,12 +5,13 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
+    time::Instant,
 };
 
 use async_stream::try_stream;
 use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
-use tokio::{runtime::Handle, sync::Mutex, time::Instant};
+use tokio::{runtime::Handle, sync::Mutex};
 
 use crate::{
     asynchronous::{callback::OptionalCallback, transport::AsyncTransportType},

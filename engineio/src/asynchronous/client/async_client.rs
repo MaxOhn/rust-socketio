@@ -94,6 +94,7 @@ mod test {
     use crate::{asynchronous::ClientBuilder, header::HeaderMap, packet::PacketId, Error};
     use bytes::Bytes;
     use futures_util::StreamExt;
+    use http::header::HOST;
     use url::Url;
 
     /// The purpose of this test is to check whether the Client is properly cloneable or not.
@@ -160,8 +161,6 @@ mod test {
 
         Ok(())
     }
-
-    use reqwest::header::HOST;
 
     use crate::packet::Packet;
 
@@ -302,7 +301,9 @@ mod test {
         headers.insert(HOST, host);
         let mut builder = builder(url.clone());
 
-        builder = builder.headers(headers.clone());
+        builder = builder
+            .headers(headers.clone())
+            .tls_config(crate::test::tls_connector()?);
         let socket = builder.clone().build_websocket_with_upgrade().await?;
 
         test_connection(socket).await?;

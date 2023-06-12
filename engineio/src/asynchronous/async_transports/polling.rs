@@ -4,9 +4,12 @@ use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine as _};
 use bytes::{BufMut, Bytes, BytesMut};
 use futures_util::{Stream, StreamExt};
-use http::HeaderMap;
-use reqwest::{Client, ClientBuilder, Response};
+use http::{HeaderMap, Request, Response};
+use hyper::client::{HttpConnector, ResponseFuture};
+use hyper::{Body, Client as HyperClient, Error as HyperError};
+use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use std::fmt::Debug;
+use std::future::IntoFuture;
 use std::time::SystemTime;
 use std::{pin::Pin, sync::Arc};
 use tokio::sync::RwLock;
@@ -24,10 +27,90 @@ pub struct PollingTransport {
     generator: StreamGenerator<Bytes>,
 }
 
+type Connector = HttpsConnector<HttpConnector>;
+
+#[derive(Clone, Debug)]
+struct Client {
+    client: HyperClient<Connector>,
+    headers: HeaderMap,
+}
+
+impl Client {
+    fn new() -> Self {
+        Self::with_headers(HeaderMap::default())
+    }
+
+    fn with_headers(headers: HeaderMap) -> Self {
+        let mut http = HttpConnector::new();
+        http.enforce_http(false);
+
+        let connector = HttpsConnectorBuilder::new()
+            .with_webpki_roots()
+            .https_or_http()
+            .enable_http1()
+            .enable_http2()
+            .wrap_connector(http);
+
+        let client = HyperClient::builder().build(connector);
+
+        Self { client, headers }
+    }
+
+    fn get(&self, url: Url) -> RequestBuilder<'_> {
+        let mut req = Request::get(url.as_str());
+        let Some(headers) = req.headers_mut() else { unreachable!() };
+        headers.extend(self.headers.clone());
+
+        RequestBuilder {
+            req,
+            body: None,
+            client: &self.client,
+        }
+    }
+
+    fn post(&self, url: Url) -> RequestBuilder<'_> {
+        let mut req = Request::post(url.as_str());
+        let Some(headers) = req.headers_mut() else { unreachable!() };
+        headers.extend(self.headers.clone());
+
+        RequestBuilder {
+            req,
+            body: None,
+            client: &self.client,
+        }
+    }
+}
+
+struct RequestBuilder<'c> {
+    req: http::request::Builder,
+    body: Option<Body>,
+    client: &'c HyperClient<Connector>,
+}
+
+impl RequestBuilder<'_> {
+    fn body(mut self, body: impl Into<Body>) -> Self {
+        self.body = Some(body.into());
+
+        self
+    }
+}
+
+impl IntoFuture for RequestBuilder<'_> {
+    type Output = std::result::Result<Response<Body>, HyperError>;
+    type IntoFuture = ResponseFuture;
+
+    fn into_future(self) -> Self::IntoFuture {
+        let body = self.body.unwrap_or_else(Body::empty);
+        let req = self.req.body(body).unwrap();
+
+        self.client.request(req)
+    }
+}
+
 impl PollingTransport {
     pub fn new(base_url: Url, opening_headers: Option<HeaderMap>) -> Self {
         let client = match opening_headers {
-            Some(map) => ClientBuilder::new().default_headers(map).build().unwrap(),
+            Some(map) => Client::with_headers(map),
             None => Client::new(),
         };
 
@@ -48,13 +131,12 @@ impl PollingTransport {
         Ok(url)
     }
 
-    fn send_request(url: Url, client: Client) -> impl Stream<Item = Result<Response>> {
+    fn send_request(url: Url, client: Client) -> impl Stream<Item = Result<Response<Body>>> {
         try_stream! {
-            let address = Self::address(url);
+            let address = Self::address(url)?;
+            let req = client.get(address);
 
-            yield client
-                .get(address?)
-                .send().await?
+            yield req.await?
         }
     }
 
@@ -65,7 +147,7 @@ impl PollingTransport {
         Box::pin(try_stream! {
             loop {
                 for await elem in Self::send_request(url.clone(), client.clone()) {
-                    for await bytes in elem?.bytes_stream() {
+                    for await bytes in elem?.into_body() {
                         yield bytes?;
                     }
                 }
@@ -105,7 +187,6 @@ impl AsyncTransport for PollingTransport {
             .client
             .post(self.address().await?)
             .body(data_to_send)
-            .send()
             .await?
             .status()
             .as_u16();

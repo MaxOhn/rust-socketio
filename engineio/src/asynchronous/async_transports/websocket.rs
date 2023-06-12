@@ -127,7 +127,7 @@ mod test {
         url.set_scheme("ws").unwrap();
         assert_eq!(transport.base_url().await?.to_string(), url.to_string());
         transport
-            .set_base_url(reqwest::Url::parse("https://127.0.0.1")?)
+            .set_base_url(Url::parse("https://127.0.0.1")?)
             .await?;
         assert_eq!(
             transport.base_url().await?.to_string(),
@@ -136,9 +136,7 @@ mod test {
         assert_ne!(transport.base_url().await?.to_string(), url.to_string());
 
         transport
-            .set_base_url(reqwest::Url::parse(
-                "http://127.0.0.1/?transport=websocket",
-            )?)
+            .set_base_url(Url::parse("http://127.0.0.1/?transport=websocket")?)
             .await?;
         assert_eq!(
             transport.base_url().await?.to_string(),

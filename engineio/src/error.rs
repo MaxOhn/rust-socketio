@@ -1,5 +1,6 @@
 use base64::DecodeError;
-use reqwest::Error as ReqwestError;
+use http::header::{InvalidHeaderName, InvalidHeaderValue};
+use hyper::Error as HyperError;
 use serde_json::Error as JsonError;
 use std::io::Error as IoError;
 use std::str::Utf8Error;
@@ -29,7 +30,7 @@ pub enum Error {
     #[error("Invalid Url Scheme: {0}")]
     InvalidUrlScheme(String),
     #[error("Error during connection via http: {0}")]
-    IncompleteResponseFromReqwest(#[from] ReqwestError),
+    IncompleteResponseFromHyper(#[from] HyperError),
     #[error("Error with websocket connection: {0}")]
     WebsocketError(#[from] TungsteniteError),
     #[error("Network request returned with status code: {0}")]
@@ -49,9 +50,9 @@ pub enum Error {
     #[error("Server did not allow upgrading to websockets")]
     IllegalWebsocketUpgrade(),
     #[error("Invalid header name")]
-    InvalidHeaderNameFromReqwest(#[from] reqwest::header::InvalidHeaderName),
+    InvalidHeaderNameFromReqwest(#[from] InvalidHeaderName),
     #[error("Invalid header value")]
-    InvalidHeaderValueFromReqwest(#[from] reqwest::header::InvalidHeaderValue),
+    InvalidHeaderValueFromReqwest(#[from] InvalidHeaderValue),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
